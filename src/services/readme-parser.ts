@@ -132,7 +132,7 @@ export class ReadmeParser {
       
       // Skip empty lines, headings, and the line with the code block marker
       if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('```')) {
-        if (description) break; // Stop if we found some description
+        if (description) {break;} // Stop if we found some description
         continue;
       }
       

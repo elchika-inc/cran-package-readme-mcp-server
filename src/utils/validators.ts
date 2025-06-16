@@ -117,5 +117,6 @@ export function sanitizeString(str: unknown): string {
     return '';
   }
   
+  // eslint-disable-next-line no-control-regex
   return str.trim().replace(/[\x00-\x1F\x7F]/g, ''); // Remove control characters
 }

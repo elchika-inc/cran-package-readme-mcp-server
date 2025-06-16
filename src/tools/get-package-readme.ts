@@ -37,7 +37,7 @@ export async function getPackageReadme(params: GetPackageReadmeParams): Promise<
       for (const url of urls) {
         if (url.includes('github.com')) {
           readmeContent = await githubApi.getReadmeContent(url) || '';
-          if (readmeContent) break;
+          if (readmeContent) {break;}
         }
       }
     }
