@@ -3,14 +3,14 @@ import { cranApi } from '../services/cran-api.js';
 import { logger } from '../utils/logger.js';
 import { validatePackageName, validateBoolean } from '../utils/validators.js';
 import { handleApiError } from '../utils/error-handler.js';
-import type { GetPackageInfoParams, PackageInfoResponse, RepositoryInfo } from '../types/index.js';
+import type { GetPackageInfoParams, PackageInfoResponse, RepositoryInfo, DownloadStats } from '../types/index.js';
 
 export async function getPackageInfo(params: GetPackageInfoParams): Promise<PackageInfoResponse> {
   try {
     // Validate parameters
     const packageName = validatePackageName(params.package_name);
     const includeDependencies = validateBoolean(params.include_dependencies, 'include_dependencies') ?? true;
-    const includeSystemRequirements = validateBoolean(params.include_system_requirements, 'include_system_requirements') ?? false;
+    const includeDevDependencies = validateBoolean(params.include_dev_dependencies, 'include_dev_dependencies') ?? false;
 
     logger.debug(`Getting package info for ${packageName}`);
 
@@ -22,26 +22,54 @@ export async function getPackageInfo(params: GetPackageInfoParams): Promise<Pack
       return cached;
     }
 
-    // Get package information from CRAN
-    const packageInfo = await cranApi.getPackageInfo(packageName);
-
-    // Get dependencies if requested
-    let dependencies: string[] | undefined;
-    if (includeDependencies) {
-      dependencies = await cranApi.getPackageDependencies(packageName);
+    // Try to get package information from CRAN
+    let packageInfo;
+    try {
+      packageInfo = await cranApi.getPackageInfo(packageName);
+    } catch (error) {
+      logger.warn(`Package '${packageName}' not found in CRAN registry`);
+      return {
+        package_name: packageName,
+        latest_version: '',
+        description: '',
+        author: '',
+        license: '',
+        keywords: [],
+        download_stats: { last_day: 0, last_week: 0, last_month: 0 },
+        exists: false,
+      };
     }
 
-    // Get system requirements if requested
-    let systemRequirements: string | undefined;
-    if (includeSystemRequirements && packageInfo.NeedsCompilation) {
-      systemRequirements = packageInfo.NeedsCompilation === 'yes' ? 'Compilation required' : 'No compilation required';
+    // Get dependencies if requested
+    let dependencies: Record<string, string> | undefined;
+    let devDependencies: Record<string, string> | undefined;
+    
+    if (includeDependencies) {
+      const deps = await cranApi.getPackageDependencies(packageName);
+      if (deps.length > 0) {
+        dependencies = {};
+        deps.forEach(dep => {
+          dependencies![dep] = '*'; // CRAN doesn't provide specific version constraints
+        });
+      }
+    }
+
+    // CRAN doesn't typically have dev dependencies like npm, but we can include Suggests
+    if (includeDevDependencies && packageInfo.Suggests) {
+      const suggests = cranApi.parseDependencyString(packageInfo.Suggests);
+      if (suggests.length > 0) {
+        devDependencies = {};
+        suggests.forEach(dep => {
+          devDependencies![dep] = '*';
+        });
+      }
     }
 
     // Create repository info
     let repository: RepositoryInfo | undefined;
     if (packageInfo.URL) {
-      const githubUrl = packageInfo.URL.split(',').find(url => url.trim().includes('github.com'));
-      if (githubUrl) {
+      const githubUrl = packageInfo.URL.split(',').find(url => typeof url === 'string' && url.trim().includes('github.com'));
+      if (githubUrl && typeof githubUrl === 'string') {
         repository = {
           type: 'git',
           url: githubUrl.trim(),
@@ -50,17 +78,25 @@ export async function getPackageInfo(params: GetPackageInfoParams): Promise<Pack
       }
     }
 
+    // Create download stats (CRAN doesn't provide download stats, so we use placeholder)
+    const downloadStats: DownloadStats = {
+      last_day: 0,
+      last_week: 0,
+      last_month: 0,
+    };
+
     const result: PackageInfoResponse = {
       package_name: packageName,
       latest_version: packageInfo.Version,
-      title: packageInfo.Title,
       description: packageInfo.Description,
-      author: packageInfo.Author,
-      maintainer: packageInfo.Maintainer,
+      author: packageInfo.Author || '',
       license: packageInfo.License,
+      keywords: [], // CRAN doesn't have keywords like npm
       dependencies,
-      system_requirements: systemRequirements,
+      dev_dependencies: devDependencies,
+      download_stats: downloadStats,
       repository,
+      exists: true,
     };
 
     // Cache the result

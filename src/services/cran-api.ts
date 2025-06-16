@@ -173,7 +173,7 @@ export class CranApi {
     }
   }
 
-  private parseDependencyString(depString: string): string[] {
+  parseDependencyString(depString: string): string[] {
     // Parse dependency strings like "R (>= 3.5.0), methods, utils"
     return depString
       .split(',')

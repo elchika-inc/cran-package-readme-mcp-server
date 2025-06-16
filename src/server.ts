@@ -3,6 +3,8 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import {
   CallToolRequestSchema,
   ErrorCode,
+  ListPromptsRequestSchema,
+  ListResourcesRequestSchema,
   ListToolsRequestSchema,
   McpError,
 } from '@modelcontextprotocol/sdk/types.js';
@@ -31,11 +33,15 @@ const TOOL_DEFINITIONS = {
           type: 'string',
           description: 'The name of the CRAN package (e.g., "ggplot2", "dplyr")',
         },
+        version: {
+          type: 'string',
+          description: 'Version to retrieve (default: "latest")',
+        },
         include_examples: {
           type: 'boolean',
           description: 'Whether to include usage examples (default: true)',
           default: true,
-        },
+        }
       },
       required: ['package_name'],
     },
@@ -55,11 +61,11 @@ const TOOL_DEFINITIONS = {
           description: 'Whether to include dependencies (default: true)',
           default: true,
         },
-        include_system_requirements: {
+        include_dev_dependencies: {
           type: 'boolean',
-          description: 'Whether to include system requirements (default: false)',
+          description: 'Whether to include development dependencies (default: false)',
           default: false,
-        },
+        }
       },
       required: ['package_name'],
     },
@@ -81,6 +87,18 @@ const TOOL_DEFINITIONS = {
           minimum: 1,
           maximum: 100,
         },
+        quality: {
+          type: 'number',
+          description: 'Minimum quality score (0-1)',
+          minimum: 0,
+          maximum: 1,
+        },
+        popularity: {
+          type: 'number',
+          description: 'Minimum popularity score (0-1)',
+          minimum: 0,
+          maximum: 1,
+        }
       },
       required: ['query'],
     },
@@ -99,7 +117,9 @@ export class CranPackageReadmeMcpServer {
       {
         capabilities: {
           tools: {},
-        },
+          prompts: {},
+          resources: {}
+        }
       }
     );
 
@@ -108,14 +128,24 @@ export class CranPackageReadmeMcpServer {
 
   private setupHandlers(): void {
     // List available tools
-    this.server.setRequestHandler(ListToolsRequestSchema, async () => {
+    (this.server as any).setRequestHandler(ListToolsRequestSchema, async () => {
       return {
         tools: Object.values(TOOL_DEFINITIONS),
-      };
+      }
+    });
+
+    // Handle prompts list
+    (this.server as any).setRequestHandler(ListPromptsRequestSchema, async () => {
+      return { prompts: [] };
+    });
+
+    // Handle resources list
+    (this.server as any).setRequestHandler(ListResourcesRequestSchema, async () => {
+      return { resources: [] };
     });
 
     // Handle tool calls
-    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    (this.server as any).setRequestHandler(CallToolRequestSchema, async (request: any, _extra: any) => {
       const { name, arguments: args } = request.params;
       
 
@@ -186,6 +216,13 @@ export class CranPackageReadmeMcpServer {
     }
 
     // Validate optional parameters
+    if (params.version !== undefined && typeof params.version !== 'string') {
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        'version must be a string'
+      );
+    }
+
     if (params.include_examples !== undefined && typeof params.include_examples !== 'boolean') {
       throw new McpError(
         ErrorCode.InvalidParams,
@@ -196,6 +233,10 @@ export class CranPackageReadmeMcpServer {
     const result: GetPackageReadmeParams = {
       package_name: params.package_name,
     };
+    
+    if (params.version !== undefined) {
+      result.version = params.version as string;
+    }
     
     if (params.include_examples !== undefined) {
       result.include_examples = params.include_examples as boolean;
@@ -210,9 +251,9 @@ export class CranPackageReadmeMcpServer {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(result, null, 2),
-        },
-      ],
+          text: JSON.stringify(result, null, 2)
+        }
+      ]
     };
   }
 
@@ -242,10 +283,10 @@ export class CranPackageReadmeMcpServer {
       );
     }
 
-    if (params.include_system_requirements !== undefined && typeof params.include_system_requirements !== 'boolean') {
+    if (params.include_dev_dependencies !== undefined && typeof params.include_dev_dependencies !== 'boolean') {
       throw new McpError(
         ErrorCode.InvalidParams,
-        'include_system_requirements must be a boolean'
+        'include_dev_dependencies must be a boolean'
       );
     }
 
@@ -257,8 +298,8 @@ export class CranPackageReadmeMcpServer {
       result.include_dependencies = params.include_dependencies as boolean;
     }
     
-    if (params.include_system_requirements !== undefined) {
-      result.include_system_requirements = params.include_system_requirements as boolean;
+    if (params.include_dev_dependencies !== undefined) {
+      result.include_dev_dependencies = params.include_dev_dependencies as boolean;
     }
     
     return result;
@@ -270,9 +311,9 @@ export class CranPackageReadmeMcpServer {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(result, null, 2),
-        },
-      ],
+          text: JSON.stringify(result, null, 2)
+        }
+      ]
     };
   }
 
@@ -304,12 +345,38 @@ export class CranPackageReadmeMcpServer {
       }
     }
 
+    if (params.quality !== undefined) {
+      if (typeof params.quality !== 'number' || params.quality < 0 || params.quality > 1) {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          'quality must be a number between 0 and 1'
+        );
+      }
+    }
+
+    if (params.popularity !== undefined) {
+      if (typeof params.popularity !== 'number' || params.popularity < 0 || params.popularity > 1) {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          'popularity must be a number between 0 and 1'
+        );
+      }
+    }
+
     const result: SearchPackagesParams = {
       query: params.query,
     };
     
     if (params.limit !== undefined) {
       result.limit = params.limit as number;
+    }
+
+    if (params.quality !== undefined) {
+      result.quality = params.quality as number;
+    }
+
+    if (params.popularity !== undefined) {
+      result.popularity = params.popularity as number;
     }
     
     return result;
@@ -321,9 +388,9 @@ export class CranPackageReadmeMcpServer {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(result, null, 2),
-        },
-      ],
+          text: JSON.stringify(result, null, 2)
+        }
+      ]
     };
   }
 
@@ -348,7 +415,7 @@ export class CranPackageReadmeMcpServer {
   async run(): Promise<void> {
     try {
       const transport = new StdioServerTransport();
-      await this.server.connect(transport);
+      await (this.server as any).connect(transport);
     } catch (error) {
       logger.error('Failed to start server transport', { error });
       throw error;
@@ -356,7 +423,7 @@ export class CranPackageReadmeMcpServer {
   }
 
   async stop(): Promise<void> {
-    await this.server.close();
+    await (this.server as any).close();
   }
 }
 

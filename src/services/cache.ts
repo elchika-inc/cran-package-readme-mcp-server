@@ -168,8 +168,8 @@ export const createCacheKey = {
   packageInfo: (packageName: string): string => 
     `pkg_info:${packageName}`,
   
-  packageReadme: (packageName: string): string => 
-    `pkg_readme:${packageName}`,
+  packageReadme: (packageName: string, version = 'latest'): string => 
+    `pkg_readme:${packageName}:${version}`,
   
   searchResults: (query: string, limit: number): string => {
     const queryHash = Buffer.from(query).toString('base64');

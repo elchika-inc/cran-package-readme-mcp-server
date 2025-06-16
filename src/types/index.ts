@@ -23,6 +23,12 @@ export interface RepositoryInfo {
   bugreports?: string | undefined;
 }
 
+export interface DownloadStats {
+  last_day: number;
+  last_week: number;
+  last_month: number;
+}
+
 export interface PackageBasicInfo {
   name: string;
   version: string;
@@ -32,6 +38,25 @@ export interface PackageBasicInfo {
   maintainer: string;
   license: string;
   keywords?: string[] | undefined;
+}
+
+export interface PackageSearchResult {
+  name: string;
+  version: string;
+  description: string;
+  keywords: string[];
+  author: string;
+  publisher: string;
+  maintainers: string[];
+  score: {
+    final: number;
+    detail: {
+      quality: number;
+      popularity: number;  
+      maintenance: number;
+    };
+  };
+  searchScore: number;
 }
 
 export interface CranPackageSearchResult {
@@ -48,51 +73,54 @@ export interface CranPackageSearchResult {
 // Tool Parameters
 export interface GetPackageReadmeParams {
   package_name: string;    // Package name (required)
+  version?: string;        // Version (optional, default: "latest")
   include_examples?: boolean; // Whether to include examples (optional, default: true)
 }
 
 export interface GetPackageInfoParams {
   package_name: string;
   include_dependencies?: boolean; // Whether to include dependencies (default: true)
-  include_system_requirements?: boolean; // Whether to include system requirements (default: false)
+  include_dev_dependencies?: boolean; // Whether to include development dependencies (default: false)
 }
 
 export interface SearchPackagesParams {
   query: string;          // Search query
   limit?: number;         // Max results (default: 20)
+  quality?: number;       // Minimum quality score (0-1)
+  popularity?: number;    // Minimum popularity score (0-1)
 }
 
 // Tool Responses
 export interface PackageReadmeResponse {
   package_name: string;
   version: string;
-  title: string;
   description: string;
   readme_content: string;
   usage_examples: UsageExample[];
   installation: InstallationInfo;
   basic_info: PackageBasicInfo;
   repository?: RepositoryInfo | undefined;
+  exists: boolean;
 }
 
 export interface PackageInfoResponse {
   package_name: string;
   latest_version: string;
-  title: string;
   description: string;
-  author?: string | AuthorInfo[] | undefined;
-  maintainer: string;
+  author: string;
   license: string;
-  keywords?: string[] | undefined;
-  dependencies?: string[] | undefined;
-  system_requirements?: string | undefined;
+  keywords: string[];
+  dependencies?: Record<string, string> | undefined;
+  dev_dependencies?: Record<string, string> | undefined;
+  download_stats: DownloadStats;
   repository?: RepositoryInfo | undefined;
+  exists: boolean;
 }
 
 export interface SearchPackagesResponse {
   query: string;
   total: number;
-  packages: CranPackageSearchResult[];
+  packages: PackageSearchResult[];
 }
 
 // Cache Types
