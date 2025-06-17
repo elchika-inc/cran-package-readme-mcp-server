@@ -23,8 +23,8 @@ import {
 } from './types/index.js';
 
 const TOOL_DEFINITIONS = {
-  get_package_readme: {
-    name: 'get_package_readme',
+  get_readme_from_cran: {
+    name: 'get_readme_from_cran',
     description: 'Get package README and usage examples from CRAN',
     inputSchema: {
       type: 'object',
@@ -46,8 +46,8 @@ const TOOL_DEFINITIONS = {
       required: ['package_name'],
     },
   },
-  get_package_info: {
-    name: 'get_package_info',
+  get_package_info_from_cran: {
+    name: 'get_package_info_from_cran',
     description: 'Get package basic information and dependencies from CRAN',
     inputSchema: {
       type: 'object',
@@ -70,8 +70,8 @@ const TOOL_DEFINITIONS = {
       required: ['package_name'],
     },
   },
-  search_packages: {
-    name: 'search_packages',
+  search_packages_from_cran: {
+    name: 'search_packages_from_cran',
     description: 'Search for packages in CRAN',
     inputSchema: {
       type: 'object',
@@ -159,13 +159,13 @@ export class CranPackageReadmeMcpServer {
         }
 
         switch (name) {
-          case 'get_package_readme':
+          case 'get_readme_from_cran':
             return await this.handleGetPackageReadme(this.validateGetPackageReadmeParams(args));
           
-          case 'get_package_info':
+          case 'get_package_info_from_cran':
             return await this.handleGetPackageInfo(this.validateGetPackageInfoParams(args));
           
-          case 'search_packages':
+          case 'search_packages_from_cran':
             return await this.handleSearchPackages(this.validateSearchPackagesParams(args));
           
           default:
