@@ -1,117 +1,110 @@
 # CRAN Package README MCP Server
 
+[![license](https://img.shields.io/npm/l/cran-package-readme-mcp-server)](https://github.com/elchika-inc/cran-package-readme-mcp-server/blob/main/LICENSE)
 [![npm version](https://img.shields.io/npm/v/cran-package-readme-mcp-server)](https://www.npmjs.com/package/cran-package-readme-mcp-server)
 [![npm downloads](https://img.shields.io/npm/dm/cran-package-readme-mcp-server)](https://www.npmjs.com/package/cran-package-readme-mcp-server)
-[![GitHub stars](https://img.shields.io/github/stars/naoto24kawa/cran-package-readme-mcp-server)](https://github.com/naoto24kawa/cran-package-readme-mcp-server)
-[![GitHub issues](https://img.shields.io/github/issues/naoto24kawa/cran-package-readme-mcp-server)](https://github.com/naoto24kawa/cran-package-readme-mcp-server/issues)
-[![license](https://img.shields.io/npm/l/cran-package-readme-mcp-server)](https://github.com/naoto24kawa/cran-package-readme-mcp-server/blob/main/LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/elchika-inc/cran-package-readme-mcp-server)](https://github.com/elchika-inc/cran-package-readme-mcp-server)
 
-An MCP (Model Context Protocol) server for fetching CRAN package README and documentation information.
+An MCP (Model Context Protocol) server that enables AI assistants to fetch comprehensive information about CRAN (Comprehensive R Archive Network) packages, including README content, package metadata, and search functionality.
 
 ## Features
 
-This MCP server provides three main tools for interacting with CRAN packages:
+- **Package README Retrieval**: Fetch formatted README content with usage examples from R/CRAN packages hosted on CRAN repository
+- **Package Information**: Get comprehensive package metadata including dependencies, versions, maintainer information, and documentation
+- **Package Search**: Search CRAN repository with filtering by category, topic, and popularity
+- **Smart Caching**: Intelligent caching system to optimize API usage and improve response times
+- **GitHub Integration**: Seamless integration with GitHub API for enhanced README fetching from package repositories
+- **Error Handling**: Robust error handling with automatic retry logic and fallback strategies
 
-### 1. `get_readme_from_cran`
-Get package README and usage examples from CRAN.
+## MCP Client Configuration
 
-**Parameters:**
-- `package_name` (required): The name of the CRAN package (e.g., "ggplot2", "dplyr")
-- `version` (optional): Version to retrieve (default: "latest")
-- `include_examples` (optional): Whether to include usage examples (default: true)
-
-### 2. `get_package_info_from_cran`
-Get package basic information and dependencies from CRAN.
-
-**Parameters:**
-- `package_name` (required): The name of the CRAN package
-- `include_dependencies` (optional): Whether to include dependencies (default: true)
-- `include_dev_dependencies` (optional): Whether to include development dependencies (default: false)
-
-### 3. `search_packages_from_cran`
-Search for packages in CRAN.
-
-**Parameters:**
-- `query` (required): The search query
-- `limit` (optional): Maximum number of results to return (default: 20, max: 100)
-- `quality` (optional): Minimum quality score (0-1)
-- `popularity` (optional): Minimum popularity score (0-1)
-
-## Installation
-
-```bash
-npm install cran-package-readme-mcp-server
-```
-
-## Usage
-
-### Claude Desktop Configuration
-
-Add to your Claude Desktop configuration file:
+Add this server to your MCP client configuration:
 
 ```json
 {
   "mcpServers": {
-    "cran-readme": {
+    "cran-package-readme": {
       "command": "npx",
-      "args": ["cran-package-readme-mcp-server"]
+      "args": ["cran-package-readme-mcp-server"],
+      "env": {
+        "GITHUB_TOKEN": "your_github_token_here"
+      }
     }
   }
 }
 ```
 
-### Direct Usage
+> **Note**: The `GITHUB_TOKEN` is optional but recommended for higher API rate limits when fetching README content from GitHub.
 
-```bash
-npx cran-package-readme-mcp-server
+## Available Tools
+
+### get_package_readme
+
+Retrieves comprehensive README content and usage examples for CRAN packages.
+
+**Parameters:**
+```json
+{
+  "package_name": "ggplot2",
+  "version": "latest",
+  "include_examples": true
+}
 ```
 
-## Example Usage
+- `package_name` (string, required): CRAN package name (e.g., "ggplot2", "dplyr")
+- `version` (string, optional): Specific package version or "latest" (default: "latest")
+- `include_examples` (boolean, optional): Include usage examples and code snippets (default: true)
 
-Once configured with Claude Desktop, you can use natural language to interact with CRAN packages:
+**Returns:** Formatted README content with installation instructions, usage examples, and function documentation.
 
-- "Get the README for the ggplot2 package"
-- "Show me information about the dplyr package including its dependencies"
-- "Search for packages related to machine learning"
-- "Find popular packages for data visualization"
+### get_package_info
 
-## Development
+Fetches detailed package metadata, dependencies, and maintainer information from CRAN.
 
-### Prerequisites
-
-- Node.js 18 or higher
-- TypeScript
-
-### Setup
-
-```bash
-# Clone the repository
-git clone <repository-url>
-cd cran-package-readme-mcp-server
-
-# Install dependencies
-npm install
-
-# Build the project
-npm run build
-
-# Run tests
-npm test
+**Parameters:**
+```json
+{
+  "package_name": "dplyr",
+  "include_dependencies": true,
+  "include_dev_dependencies": false
+}
 ```
 
-### Scripts
+- `package_name` (string, required): CRAN package name
+- `include_dependencies` (boolean, optional): Include runtime dependencies (default: true)
+- `include_dev_dependencies` (boolean, optional): Include development dependencies (default: false)
 
-- `npm run build` - Compile TypeScript to JavaScript
-- `npm run dev` - Run in development mode
-- `npm start` - Start the server
-- `npm test` - Run tests
-- `npm run lint` - Run ESLint
-- `npm run typecheck` - Run TypeScript type checking
+**Returns:** Package metadata including version info, maintainer details, license, download stats, and dependency information.
+
+### search_packages
+
+Searches CRAN repository for packages with filtering capabilities.
+
+**Parameters:**
+```json
+{
+  "query": "machine learning",
+  "limit": 20,
+  "category": "MachineLearning"
+}
+```
+
+- `query` (string, required): Search terms (package name, description, keywords)
+- `limit` (number, optional): Maximum number of results to return (default: 20, max: 100)
+- `category` (string, optional): Filter by package category (Graphics, Statistics, MachineLearning, etc.)
+
+**Returns:** List of matching packages with names, descriptions, maintainers, and popularity metrics.
+
+## Error Handling
+
+The server handles common error scenarios gracefully:
+
+- **Package not found**: Returns clear error messages with similar package suggestions
+- **Rate limiting**: Implements automatic retry with exponential backoff
+- **Network timeouts**: Configurable timeout with retry logic
+- **Invalid package names**: Validates package name format and provides guidance
+- **CRAN mirror failures**: Fallback strategies when primary CRAN mirror is unavailable
 
 ## License
 
 MIT
-
-## Author
-
-naoto24kawa
