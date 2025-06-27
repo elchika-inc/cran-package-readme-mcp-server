@@ -46,6 +46,10 @@ export class CranApi {
       }
 
       const data = await response.json() as CranPackageInfo;
+      
+      // Add the name field for convenience
+      data.name = packageName;
+      
       logger.debug(`Fetched package info for: ${packageName}`);
 
       return data;

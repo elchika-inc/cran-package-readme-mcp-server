@@ -137,6 +137,7 @@ export interface CacheOptions {
 
 // CRAN API Types
 export interface CranPackageInfo {
+  name: string;           // Computed field for convenience
   Package: string;
   Version: string;
   Priority?: string;

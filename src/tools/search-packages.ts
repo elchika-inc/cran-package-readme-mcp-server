@@ -5,6 +5,111 @@ import { validateSearchQuery, validateLimit } from '../utils/validators.js';
 import { handleApiError } from '../utils/error-handler.js';
 import type { SearchPackagesParams, SearchPackagesResponse, PackageSearchResult } from '../types/index.js';
 
+function calculateSearchRelevance(name: string, description: string, query: string): number {
+  const queryLower = query.toLowerCase();
+  const nameLower = name.toLowerCase();
+  const descriptionLower = description.toLowerCase();
+  
+  // Exact name match gets highest score
+  if (nameLower === queryLower) return 1.0;
+  
+  // Name starts with query gets high score
+  if (nameLower.startsWith(queryLower)) return 0.9;
+  
+  // Name contains query gets medium score
+  if (nameLower.includes(queryLower)) return 0.7;
+  
+  // Description contains query gets lower score
+  if (descriptionLower.includes(queryLower)) return 0.5;
+  
+  // Fuzzy matching for typos/partial matches
+  const nameDistance = levenshteinDistance(nameLower, queryLower);
+  const maxLength = Math.max(nameLower.length, queryLower.length);
+  const similarity = 1 - (nameDistance / maxLength);
+  
+  return Math.max(0.1, similarity * 0.4);
+}
+
+function calculateQualityScore(pkg: any): number {
+  let score = 0.5; // Base score
+  
+  // Long description indicates more documentation
+  if (pkg.description && pkg.description.length > 100) score += 0.2;
+  if (pkg.description && pkg.description.length > 200) score += 0.1;
+  
+  // Has title indicates structured package
+  if (pkg.title && pkg.title.length > 10) score += 0.1;
+  
+  // License indicates proper packaging
+  if (pkg.license && pkg.license !== 'Unknown') score += 0.1;
+  
+  return Math.min(1.0, score);
+}
+
+function calculatePopularityScore(pkg: any, index: number, totalResults: number): number {
+  // CRAN search results are ordered by relevance, early results are more popular
+  const positionScore = Math.max(0.1, 1 - (index / totalResults));
+  
+  // Shorter names tend to be more established packages
+  const nameScore = pkg.name.length <= 8 ? 0.2 : 0.1;
+  
+  // Common R package prefixes indicate ecosystem integration
+  const prefixScore = /^(r|R|tidyr?|dplyr?|ggplot?)/.test(pkg.name) ? 0.1 : 0;
+  
+  return Math.min(1.0, positionScore * 0.7 + nameScore + prefixScore);
+}
+
+function calculateMaintenanceScore(pkg: any): number {
+  let score = 0.5; // Base score
+  
+  // Recent publication date indicates active maintenance
+  if (pkg.published && pkg.published !== 'Unknown') {
+    try {
+      const pubDate = new Date(pkg.published);
+      const daysSincePublish = (Date.now() - pubDate.getTime()) / (1000 * 60 * 60 * 24);
+      
+      if (daysSincePublish < 365) score += 0.3; // Published within a year
+      else if (daysSincePublish < 730) score += 0.2; // Published within 2 years
+      else if (daysSincePublish < 1095) score += 0.1; // Published within 3 years
+    } catch {
+      // Invalid date, use base score
+    }
+  }
+  
+  // Has maintainer indicates active project
+  if (pkg.maintainer && pkg.maintainer !== 'Unknown') score += 0.2;
+  
+  return Math.min(1.0, score);
+}
+
+function levenshteinDistance(str1: string, str2: string): number {
+  const matrix = [];
+  
+  for (let i = 0; i <= str2.length; i++) {
+    matrix[i] = [i];
+  }
+  
+  for (let j = 0; j <= str1.length; j++) {
+    matrix[0][j] = j;
+  }
+  
+  for (let i = 1; i <= str2.length; i++) {
+    for (let j = 1; j <= str1.length; j++) {
+      if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1, // substitution
+          matrix[i][j - 1] + 1,     // insertion
+          matrix[i - 1][j] + 1      // deletion
+        );
+      }
+    }
+  }
+  
+  return matrix[str2.length][str1.length];
+}
+
 export async function searchPackages(params: SearchPackagesParams): Promise<SearchPackagesResponse> {
   try {
     // Validate parameters
@@ -26,14 +131,14 @@ export async function searchPackages(params: SearchPackagesParams): Promise<Sear
     // Search packages using CRAN API
     const searchResults = await cranApi.searchPackages(query, limit);
 
-    // Transform the results to our format with mock scoring
+    // Transform the results to our format with improved scoring
     const packages: PackageSearchResult[] = searchResults.map((pkg, index) => {
-      // Generate mock scores based on position and package characteristics
-      const baseScore = Math.max(0.1, 1 - (index / searchResults.length));
-      const qualityScore = Math.min(1, baseScore + (pkg.description.length > 100 ? 0.1 : 0));
-      const popularityScore = Math.min(1, baseScore + (pkg.name.length < 10 ? 0.1 : 0));
-      const maintenanceScore = Math.min(1, baseScore + 0.1);
-      const finalScore = (qualityScore + popularityScore + maintenanceScore) / 3;
+      // Calculate more realistic scores based on actual package characteristics
+      const searchRelevance = calculateSearchRelevance(pkg.name, pkg.description, query);
+      const qualityScore = calculateQualityScore(pkg);
+      const popularityScore = calculatePopularityScore(pkg, index, searchResults.length);
+      const maintenanceScore = calculateMaintenanceScore(pkg);
+      const finalScore = (qualityScore * 0.4 + popularityScore * 0.3 + maintenanceScore * 0.2 + searchRelevance * 0.1);
 
       return {
         name: pkg.name,
@@ -51,7 +156,7 @@ export async function searchPackages(params: SearchPackagesParams): Promise<Sear
             maintenance: maintenanceScore,
           },
         },
-        searchScore: baseScore,
+        searchScore: searchRelevance,
       };
     });
 
