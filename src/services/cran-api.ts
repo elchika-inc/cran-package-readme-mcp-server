@@ -1,5 +1,7 @@
 import { logger } from '../utils/logger.js';
 import { handleApiError } from '../utils/error-handler.js';
+import { DependencyParser } from './dependency-parser.js';
+import { PackageSearch } from './package-search.js';
 import type { CranPackageInfo, CranSearchResult } from '../types/index.js';
 
 const CRANDB_BASE_URL = 'https://crandb.r-pkg.org';
@@ -82,40 +84,7 @@ export class CranApi {
 
   async searchPackages(query: string, limit: number = 20): Promise<CranSearchResult[]> {
     try {
-      // CRAN doesn't have a native search API, so we'll implement basic search
-      // by fetching all packages and filtering
-      const allPackages = await this.getAllPackages();
-      
-      const queryLower = query.toLowerCase();
-      const matchingPackages = allPackages.filter(pkg => 
-        pkg.toLowerCase().includes(queryLower)
-      ).slice(0, limit);
-
-      logger.debug(`Found ${matchingPackages.length} matching packages for query: ${query}`);
-
-      // Fetch detailed info for matching packages
-      const results: CranSearchResult[] = [];
-      
-      for (const packageName of matchingPackages) {
-        try {
-          const packageInfo = await this.getPackageInfo(packageName);
-          results.push({
-            name: packageInfo.Package,
-            title: packageInfo.Title,
-            description: packageInfo.Description,
-            version: packageInfo.Version,
-            author: packageInfo.Author || 'Unknown',
-            maintainer: packageInfo.Maintainer,
-            license: packageInfo.License,
-            published: packageInfo['Date/Publication'] || packageInfo.date || 'Unknown',
-          });
-        } catch (error) {
-          logger.debug(`Failed to fetch info for ${packageName}:`, error);
-          // Continue with other packages
-        }
-      }
-
-      return results;
+      return await PackageSearch.searchPackages(query, limit);
     } catch (error) {
       handleApiError(error, 'CRAN search');
     }
@@ -152,37 +121,10 @@ export class CranApi {
   async getPackageDependencies(packageName: string): Promise<string[]> {
     try {
       const packageInfo = await this.getPackageInfo(packageName);
-      const dependencies: string[] = [];
-      
-      // Parse dependencies from different fields
-      if (packageInfo.Depends) {
-        const depends = this.parseDependencyString(packageInfo.Depends);
-        dependencies.push(...depends);
-      }
-      
-      if (packageInfo.Imports) {
-        const imports = this.parseDependencyString(packageInfo.Imports);
-        dependencies.push(...imports);
-      }
-      
-      if (packageInfo.LinkingTo) {
-        const linkingTo = this.parseDependencyString(packageInfo.LinkingTo);
-        dependencies.push(...linkingTo);
-      }
-      
-      // Remove duplicates and R itself
-      return [...new Set(dependencies)].filter(dep => dep !== 'R');
+      return DependencyParser.parsePackageDependencies(packageInfo);
     } catch (error) {
       handleApiError(error, `dependencies for ${packageName}`);
     }
-  }
-
-  parseDependencyString(depString: string): string[] {
-    // Parse dependency strings like "R (>= 3.5.0), methods, utils"
-    return depString
-      .split(',')
-      .map(dep => dep.trim().split(/\s+/)[0]) // Take package name before version requirements
-      .filter(dep => dep.length > 0);
   }
 }
 

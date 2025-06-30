@@ -52,10 +52,11 @@ export class PackageResponseBuilder {
   }
 
   private createInstallationInfo(packageName: string, packageInfo: CranPackageInfo): InstallationInfo {
+    const githubUrl = packageInfo.URL?.split(',').find(url => url.trim().includes('github.com'));
     return {
       cran: `install.packages("${packageName}")`,
-      devtools: packageInfo.URL && packageInfo.URL.includes('github.com') 
-        ? `devtools::install_github("${this.extractGitHubPath(packageInfo.URL)}")`
+      devtools: githubUrl 
+        ? `devtools::install_github("${this.extractGitHubPath(githubUrl.trim())}")`
         : undefined,
       remotes: `remotes::install_cran("${packageName}")`,
     };

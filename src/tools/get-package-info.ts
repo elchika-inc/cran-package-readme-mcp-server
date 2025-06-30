@@ -1,5 +1,6 @@
 import { cache, createCacheKey } from '../services/cache.js';
 import { cranApi } from '../services/cran-api.js';
+import { DependencyParser } from '../services/dependency-parser.js';
 import { logger } from '../utils/logger.js';
 import { validatePackageName, validateBoolean } from '../utils/validators.js';
 import { handleApiError } from '../utils/error-handler.js';
@@ -56,10 +57,10 @@ export async function getPackageInfo(params: GetPackageInfoParams): Promise<Pack
 
     // CRAN doesn't typically have dev dependencies like npm, but we can include Suggests
     if (includeDevDependencies && packageInfo.Suggests) {
-      const suggests = cranApi.parseDependencyString(packageInfo.Suggests);
+      const suggests = DependencyParser.parseDependencyString(packageInfo.Suggests);
       if (suggests.length > 0) {
         devDependencies = {};
-        suggests.forEach(dep => {
+        suggests.forEach((dep: string) => {
           devDependencies![dep] = '*';
         });
       }

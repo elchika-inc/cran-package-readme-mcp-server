@@ -177,10 +177,56 @@ export class MemoryCache {
   private estimateEntrySize<T>(key: string, entry: CacheEntry<T>): number {
     // Rough estimation: key + JSON serialized data + metadata
     const keySize = key.length * 2; // UTF-16
-    const dataSize = JSON.stringify(entry.data).length * 2;
+    let dataSize: number;
+    
+    try {
+      dataSize = JSON.stringify(entry.data).length * 2;
+    } catch (error) {
+      // Handle circular references or other serialization errors
+      // Use a conservative estimate based on the object structure
+      dataSize = this.estimateSizeRecursively(entry.data, new Set()) * 2;
+    }
+    
     const metadataSize = 24; // timestamp + ttl + object overhead
     
     return keySize + dataSize + metadataSize;
+  }
+
+  private estimateSizeRecursively<T>(obj: T, visited: Set<any>): number {
+    if (obj === null || obj === undefined) {
+      return 4; // 'null' or 'undefined'
+    }
+
+    if (visited.has(obj)) {
+      return 20; // Conservative estimate for circular reference
+    }
+
+    const type = typeof obj;
+    
+    switch (type) {
+      case 'boolean':
+        return 5; // 'true' or 'false'
+      case 'number':
+        return String(obj).length;
+      case 'string':
+        return (obj as string).length;
+      case 'object':
+        if (Array.isArray(obj)) {
+          visited.add(obj);
+          const arraySize = obj.reduce((sum, item) => sum + this.estimateSizeRecursively(item, visited), 2); // 2 for []
+          visited.delete(obj);
+          return arraySize;
+        } else {
+          visited.add(obj);
+          const objectSize = Object.entries(obj as Record<string, any>).reduce((sum, [key, value]) => {
+            return sum + key.length + 3 + this.estimateSizeRecursively(value, visited); // 3 for ":"
+          }, 2); // 2 for {}
+          visited.delete(obj);
+          return objectSize;
+        }
+      default:
+        return 50; // Conservative estimate for unknown types
+    }
   }
 
   destroy(): void {
